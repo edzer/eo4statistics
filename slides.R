@@ -30,6 +30,7 @@ v = st_extract(x["f",,,1], s)
 
 
 ## -----------------------------------------------------------------------------
+n
 se = sqrt(m * (1 - m) / n)
 m + qnorm(c(.025,.975)) * se
 
@@ -49,7 +50,7 @@ m = sapply(1:100, function(y) mean(st_extract(x["f",,,1], st_sample(aoi, n))$f =
 	na.rm = TRUE))
 se = sqrt(m * (1 - m) / n)
 int = cbind(m + qnorm(.025) * se, m + qnorm(.975) * se)
-plot(1:100, m, pch = 3, cex = .5, xlim = c(0,101), ylim = c(0.3, 1), xlab = "sample", ylab = "fraction forest")
+plot(1:100, m, pch = 3, cex = .5, xlim = c(0,101), ylim = c(0, .7), xlab = "sample", ylab = "fraction forest")
 segments(1:100, int[,1], y1 = int[,2])
 abline(h = mean(m), lty = 2, col = 'red')
 
