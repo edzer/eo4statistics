@@ -1,0 +1,193 @@
+---
+title: "Design-based and model-based inference and spatial sampling"
+author: "Edzer Pebesma, Hanna Meyer"
+date: "EO4Statistics meeting, Nov 12 2020"
+output:
+  ioslides_presentation:
+    widescreen: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(1331)
+```
+
+## References
+
+Most of what follows is based on the following references:
+
+* De Gruijter, J. J., & Ter Braak, C. J. F. (1990). Model-free estimation from spatial samples: a reappraisal of classical sampling theory. Mathematical geology, 22(4), 407-415.
+* Brus, D. J., & De Gruijter, J. J. (1997). Random sampling or geostatistical modelling? Choosing between design-based and model-based sampling strategies for soil (with discussion). Geoderma, 80(1-2), 1-44.
+* De Gruijter, J., Brus, D. J., Bierkens, M. F., & Knotters, M. (2006). Sampling for natural resource monitoring. Springer Science & Business Media.
+
+--------
+
+```{r echo=FALSE}
+suppressPackageStartupMessages(library(gstat))
+suppressPackageStartupMessages(library(stars))
+grd = st_as_stars(expand.grid(x = 1:100, y = 1:100))
+grd$x = 1
+v <- vgm(1, "Sph", 40)
+x <- krige(x ~ 1, locations = NULL, newdata = grd, model = v, 
+	nmax = 20, beta = 0, nsim = 6, dummy = TRUE, debug.level = 0)
+x$f = factor((x < 0.5)[[1]], labels = c("Forest", "Non-Forest"))
+plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
+aoi = st_as_sfc(st_bbox(x))
+plot(aoi, col = NA, border = 'red', add = TRUE, lwd = 2)
+```
+
+What is the proportion of $p_F$ of forest in the area of interest (box)?
+
+* Given we can plan the sampling, how should we do that?
+* Given a sample has already been taken, what are our options to estimate $p_F$?
+
+-------
+
+```{r echo=FALSE}
+n = 50
+s = st_sample(aoi, n)
+plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
+plot(s, add = TRUE, col = 'green', pch = 3)
+v = st_extract(x["f",,,1], s)
+```
+
+## 95% CI, design-based, simple random sampling
+
+Sample mean:
+```{r}
+(m = mean(v$f == "Forest"))
+```
+
+9%% CI using normal approximation (CLT, n large, $m$ not too close to 0 or 1):
+```{r}
+se = sqrt(m * (1 - m) / n)
+m + qnorm(c(.025,.975)) * se
+```
+
+## What does this confidence interval mean?
+
+(we use small $s$ for a fixed variable, capital $S$ for a random variable)
+
+* it is a design-based estimate: observations on a variable $z$ at locations $s$ are considered as coming from a random sampling process, $z(S)$, with $S$ randomly sampled from the area of interest $A$: $S$ is a random variable, $z$ is fixed (as is $z(s)$).
+* because of random sampling, _any_ pair $\{z(S_i),~z(S_j)\}$ are independent, and their separation distance $|S_i-S_j|$ is again a random variable
+* the CI means that **under repeated sampling** (using the same procedure), on average 95 out of 100 cases this CI will include the population parameter $p_F$.
+
+## Replicates: repeated sampling
+
+```{r,echo=FALSE,fig.width=9.5,fig.height=2.5}
+nr = 6
+layout(matrix(1:11, 1), widths = c(1,.1,1,.1,1,.1,1,.1,1,.1,1))
+for (i in 1:nr) {
+  plot(x["f",,,1], reset = FALSE, key.pos = NULL, main = NULL)
+  plot(st_sample(aoi, n), add = TRUE, col = 'green', pch = 3)
+  if (i < nr) plot.new()
+}
+```
+...
+
+## CI coverage
+
+```{r,echo=FALSE,fig.width=9.5,fig.height=5}
+m = sapply(1:100, function(y) mean(st_extract(x["f",,,1], st_sample(aoi, n))$f == "Forest", 
+	na.rm = TRUE))
+se = sqrt(m * (1 - m) / n)
+int = cbind(m + qnorm(.025) * se, m + qnorm(.975) * se)
+plot(1:100, m, pch = 3, cex = .5, xlim = c(0,101), ylim = c(0.3, 1), xlab = "sample", ylab = "fraction forest")
+segments(1:100, int[,1], y1 = int[,2])
+abline(h = mean(m), lty = 2, col = 'red')
+```
+
+(red line: population mean)
+
+## 95% CI, model-based, whatever sampling strategy
+
+* model-based, we assume $z(s)$ to be a realisation (sample of size 1) of a superpopulation (random field) $Z(s)$
+* we postulate (assume) a model, e.g. $Z(s) = m + e(s)$, with $m$ a spatial constant unknown mean (fixed effect), and $e(s)$ a spatially correlated random variable (random effect)
+* For stationary random fields, Correlation of $Z(s_i)$ and $Z(s_j)$ are assumed to be correlated as a function of distance: $\mbox{Cov}(Z(s_i), Z(s_j)) = C(h)$, with $h=|s_i-s_j|$
+* sampling strategy does "not" play a role
+
+## Estimating $m$?
+
+```{r,echo=FALSE,fig.width=9.5,fig.height=2.5}
+nr = 6
+layout(matrix(1:11, 1), widths = c(1,.1,1,.1,1,.1,1,.1,1,.1,1))
+for (i in 1:nr) {
+  plot(x["f",,,i], reset = FALSE, key.pos = NULL, main = NULL)
+  plot(s, add = TRUE, col = 'green', pch = 3)
+  if (i < nr) plot.new()
+}
+```
+
+* $m$ is a property of the whole random field $Z(s)$, not just the realisation at hand
+(unconditional to the observations)
+* it is also in no way spatially restricted to the area of interest
+
+## Predicting $Z(A)$
+
+* Model-based, $s$ is no longer random so we predict $Z(s_0)$, by $\hat{Z}(s_0)=\sum_{i=1}^n \lambda_i Z(s_i)$ with $\lambda_i$ the kriging weights
+* This means that we can also predict the area mean $Z(A)=\frac{1}{|A|}\int_A Z(u)du$, e.g.
+using the mean of predictions over the area: 
+$$\frac{1}{K}\sum_{j=1}^K \hat{Z}(s_j)$$ 
+this is the _block kriging_ prediction; it comes with a block
+kriging standard error that takes all the correlations between
+the $\hat{Z}(s_j)$ into account: block kriging deals with _change
+of support_
+
+ 
+## Required: variogram
+
+```{r echo=FALSE}
+vg = variogram(f == "Forest" ~1, na.omit(v))
+v.fit = fit.variogram(vg, vgm(1, "Sph", 30))
+plot(vg, v.fit)
+```
+
+## Kriging predictions:
+
+```{r echo=FALSE,fig.width=10}
+kr = krige(f == "Forest" ~ 1, v, grd, v.fit, debug.level = 0)
+kr$Population = x["f",,,1] == "Forest"
+names(kr)[1] = "Kriging prediction"
+hook = function(x) plot(s, add = TRUE, col = 'green', pch = 3)
+plot(merge(kr[c(1,3)]), hook = hook, breaks = "equal")
+```
+
+## Block kriging for the whole of $A$
+
+```{r echo=FALSE}
+bl = krige(f == "Forest" ~ 1, v, aoi, v.fit, debug.level = 0)
+```
+```{r echo=FALSE}
+c(mean = bl$var1.pred)
+ci = bl$var1.pred + qnorm(c(.025,.975)) * sqrt(bl$var1.var)
+setNames(ci, c("p.025", "p.975"))
+```
+
+Compare to design-based:
+```{r echo=FALSE}
+c(mean = m <- mean(v$f == "Forest"))
+se = sqrt(m * (1 - m) / n)
+setNames(m + qnorm(c(.025,.975)) * se, c("p.025", "p.975"))
+```
+
+## What does the block kriging CI refer to?
+
+```{r,echo=FALSE,fig.width=9.5,fig.height=2.1}
+cs <- krige(f == "Forest" ~ 1, v, grd, v.fit, 
+	nmax = 20, beta = .27, nsim = 6, debug.level = 0, indicators = TRUE)
+cs$f = factor((cs < 0.5)[[1]], labels = c("Forest", "Non-Forest"))
+plot(cs["f"], hook = hook, key.pos = 1, key.length = .4, key.width=lcm(1))
+```
+
+Averaging over the _conditional_ random fields $Z(s)|z(s_i),i=1.,,,.n$ that:
+
+* have mean $m$ and covariance $C(h)$
+* obey the sample data, i.e. $Z(s_i)=z(s_i)$ for all observations $i$
+
+## Comparison design-based / model-based
+
+1. design-based methods do not need a model, and are more robust: model-based approaches lean on an assumed model.
+2. design-based models are robust only if random sampling was used, and inclusion probabilities (sample weights) are known
+3. model-based approaches make no assumption about sampling, but also have no guard against biased sampling
+4. model-based approaches can make predictions for _any_ location, and predict means over regions of _any_ shape; design-based only estimate _averages_ over the sampled region(s).
+4. the probability statements differ: design-based CI's refer to repeating the sampling procedure, model-based CI's refer to (conditional) super-populations under a fixed sample.
