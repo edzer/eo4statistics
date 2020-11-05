@@ -25,6 +25,7 @@ Most of what follows is based on the following references:
 ```{r echo=FALSE}
 suppressPackageStartupMessages(library(gstat))
 suppressPackageStartupMessages(library(stars))
+suppressPackageStartupMessages(library(caret))
 grd = st_as_stars(expand.grid(x = 1:100, y = 1:100))
 grd$x = 1
 v <- vgm(1, "Sph", 40)
@@ -45,6 +46,7 @@ What is the proportion of $p_F$ of forest in the area of interest (box)?
 
 ```{r echo=FALSE}
 n = 50
+set.seed(100)
 s = st_sample(aoi, n)
 plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
 plot(s, add = TRUE, col = 'green', pch = 3)
@@ -184,6 +186,32 @@ Averaging over the _conditional_ random fields $Z(s)|z(s_i),i=1.,,,.n$ that:
 
 * have mean $m$ and covariance $C(h)$
 * obey the sample data, i.e. $Z(s_i)=z(s_i)$ for all observations $i$
+
+## Machine learning example
+```{r,echo=FALSE,results='hide',message = FALSE, warnings = FALSE}
+data <- data.frame(st_coordinates(v),"f"=v$f)
+set.seed(100)
+model <- train(data[,c("X","Y")],data$f,method="rf",trControl = trainControl(method="cv"),
+               savePredictions=TRUE,importance=TRUE)
+
+prediction_dat <- st_coordinates(x)
+names(prediction_dat) <- c("X","Y")
+x$prediction=predict(model,prediction_dat)
+```
+
+```{r,echo=FALSE, fig.show="hold", out.width="50%",message=FALSE,warning=FALSE}
+
+print(paste0("Model accuracy: ",model$results$Accuracy, ". Really?"))
+
+plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
+plot(s, add = TRUE, col = 'green', pch = 3)
+
+plot(x["prediction",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
+plot(s, add = TRUE, col = 'green', pch = 3)
+```
+
+* How was the model validated?
+* No sensible standard errors of area estimates
 
 ## Comparison design-based / model-based
 
