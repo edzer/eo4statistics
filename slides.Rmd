@@ -10,6 +10,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 set.seed(1331)
+options(digits=3)
 ```
 
 ## References
@@ -53,16 +54,21 @@ v = st_extract(x["f",,,1], s)
 
 ## 95% CI, design-based, simple random sampling
 
-Sample mean:
+Sample mean (n = `r n`):
 ```{r}
 (m = mean(v$f == "Forest"))
 ```
 
 95% CI using normal approximation (CLT, n large, $m$ not too close to 0 or 1):
 ```{r}
-n
 se = sqrt(m * (1 - m) / n)
 m + qnorm(c(.025,.975)) * se
+```
+
+True mean (fraction over this whole single image):
+```{r echo=FALSE}
+population_mean = mean(x["f",,,1][[1]] == "Forest")
+c(population_mean = population_mean)
 ```
 
 ## What does this confidence interval mean?
@@ -86,7 +92,7 @@ for (i in 1:nr) {
 ```
 ...
 
-## CI coverage
+## CI coverage: repeated sampling
 
 ```{r,echo=FALSE,fig.width=9.5,fig.height=5}
 m = sapply(1:100, function(y) mean(st_extract(x["f",,,1], st_sample(aoi, n))$f == "Forest", 
@@ -95,17 +101,17 @@ se = sqrt(m * (1 - m) / n)
 int = cbind(m + qnorm(.025) * se, m + qnorm(.975) * se)
 plot(1:100, m, pch = 3, cex = .5, xlim = c(0,101), ylim = c(0, .7), xlab = "sample", ylab = "fraction forest")
 segments(1:100, int[,1], y1 = int[,2])
-abline(h = mean(m), lty = 2, col = 'red')
+abline(h = population_mean, lty = 2, col = 'red')
 ```
 
-(red line: population mean)
+(red line: population mean `r population_mean`)
 
-## 95% CI, model-based, whatever sampling strategy
+## model-based 95% CI
 
 * model-based, we assume $z(s)$ to be a realisation (sample of size 1) of a superpopulation (random field) $Z(s)$
 * we postulate (assume) a model, e.g. $Z(s) = m + e(s)$, with $m$ a spatial constant unknown mean (fixed effect), and $e(s)$ a spatially correlated random variable (random effect)
 * For stationary random fields, Correlation of $Z(s_i)$ and $Z(s_j)$ are assumed to be correlated as a function of distance: $\mbox{Cov}(Z(s_i), Z(s_j)) = C(h)$, with $h=|s_i-s_j|$
-* sampling strategy does "not" play a role
+* sampling strategy does "not" play a role: can be anything, but ignoring biases leads to disaster, as anywhere in statistics
 
 ## Estimating $m$?
 
@@ -119,13 +125,15 @@ for (i in 1:nr) {
 }
 ```
 
+* the boxes show _independent_ realisations of $Z(s)$, _unconditional_ to any measurements
 * $m$ is a property of the whole random field $Z(s)$, not just the realisation at hand
 (unconditional to the observations)
 * it is also in no way spatially restricted to the area of interest
+* "true" $m$ is `r 1-pnorm(0.5)` (parameter of generating process)
 
 ## Predicting $Z(A)$
 
-* Model-based, $s$ is no longer random so we predict $Z(s_0)$, by $\hat{Z}(s_0)=\sum_{i=1}^n \lambda_i Z(s_i)$ with $\lambda_i$ the kriging weights
+* Model-based, $s$ is no longer random so we can predict $Z(s_0)$ by $\hat{Z}(s_0)=\sum_{i=1}^n \lambda_i Z(s_i)$ (with $\lambda_i$ the kriging weights) for _any_ $s_0$ (kriging interpolation): estimates _probability_ of $Z(s_0)$ being forest
 * This means that we can also predict the area mean $Z(A)=\frac{1}{|A|}\int_A Z(u)du$, e.g.
 using the mean of predictions over the area: 
 $$\frac{1}{K}\sum_{j=1}^K \hat{Z}(s_j)$$ 
@@ -153,20 +161,23 @@ hook = function(x) plot(s, add = TRUE, col = 'green', pch = 3)
 plot(merge(kr[c(1,3)]), hook = hook, breaks = "equal")
 ```
 
+Left: predictions of $\hat{p}(Z(s) = \mbox{"Forest"})$, Right: population
+
 ## Block kriging for the whole of $A$
 
+Block kriging prediction:
 ```{r echo=FALSE}
 bl = krige(f == "Forest" ~ 1, v, aoi, v.fit, debug.level = 0)
 ```
 ```{r echo=FALSE}
-c(mean = bl$var1.pred)
+c(predicted_mean = bl$var1.pred)
 ci = bl$var1.pred + qnorm(c(.025,.975)) * sqrt(bl$var1.var)
 setNames(ci, c("p.025", "p.975"))
 ```
 
-Compare to design-based:
+Compare to design-based mean estimate:
 ```{r echo=FALSE}
-c(mean = m <- mean(v$f == "Forest"))
+c(estimated_mean = m <- mean(v$f == "Forest"))
 se = sqrt(m * (1 - m) / n)
 setNames(m + qnorm(c(.025,.975)) * se, c("p.025", "p.975"))
 ```
@@ -180,10 +191,10 @@ cs$f = factor((cs < 0.5)[[1]], labels = c("Forest", "Non-Forest"))
 plot(cs["f"], hook = hook, key.pos = 1, key.length = .4, key.width=lcm(1))
 ```
 
-Averaging over the _conditional_ random fields $Z(s)|z(s_i),i=1.,,,.n$ that:
+CI's reflect averaging over the _conditional_ random fields $Z(s)|z(s_i),i=1.,,,.n$ that:
 
 * have mean $m$ and covariance $C(h)$
-* obey the sample data, i.e. $Z(s_i)=z(s_i)$ for all observations $i$
+* are conditioned to ("obey the") sample data, i.e. $Z(s_i)=z(s_i)$ for all observations $i$, but are otherwise independent
 
 ## Comparison design-based / model-based
 
@@ -193,14 +204,15 @@ Averaging over the _conditional_ random fields $Z(s)|z(s_i),i=1.,,,.n$ that:
 4. model-based approaches can make predictions for _any_ location, and predict means over regions of _any_ shape; design-based only estimate _averages_ over the sampled region(s).
 5. the probability statements differ: design-based CI's refer to repeating the sampling procedure, model-based CI's refer to (conditional) super-populations under a fixed sample.
 
-## The use of R.
+## Why we use R
 
 * R is a data science language
-* All numbers and figure in these slides were generated by R (where
+* All numbers and figures in these slides were generated by R (where
 the commands were mostly suppressed, to avoid clutter): 
     * this makes them 100% reproducible, and
 	* a source for further experimentation
-	* source at https://github.com/edzer/eo4statistics/blob/master/slides.Rmd
 	* literate programming helps explaining code, computation, and intention
-* R has a number (> 16K) of extension packages, many of them for spatial statistics
-* R has the advantage (over e.g. Python) that installation of extension packages on all kind of computers (running OSX, Windows, or Linux) is relatively painless
+	* source of slides is found [here](https://github.com/edzer/eo4statistics/blob/master/slides.Rmd)
+	* copy-and-paste errors are ruled out
+* R has a number (> 16K) of extension packages, many of them for spatial statistics, well maintained, well tested.
+* R has the advantage that installation of extension packages on a variety of hardware (Mac OSX, Windows, or Linux) is relatively painless.

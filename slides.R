@@ -1,6 +1,7 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE)
 set.seed(1331)
+options(digits=3)
 
 
 ## ----echo=FALSE---------------------------------------------------------------
@@ -30,9 +31,13 @@ v = st_extract(x["f",,,1], s)
 
 
 ## -----------------------------------------------------------------------------
-n
 se = sqrt(m * (1 - m) / n)
 m + qnorm(c(.025,.975)) * se
+
+
+## ----echo=FALSE---------------------------------------------------------------
+population_mean = mean(x["f",,,1][[1]] == "Forest")
+c(population_mean = population_mean)
 
 
 ## ----echo=FALSE,fig.width=9.5,fig.height=2.5----------------------------------
@@ -52,7 +57,7 @@ se = sqrt(m * (1 - m) / n)
 int = cbind(m + qnorm(.025) * se, m + qnorm(.975) * se)
 plot(1:100, m, pch = 3, cex = .5, xlim = c(0,101), ylim = c(0, .7), xlab = "sample", ylab = "fraction forest")
 segments(1:100, int[,1], y1 = int[,2])
-abline(h = mean(m), lty = 2, col = 'red')
+abline(h = population_mean, lty = 2, col = 'red')
 
 
 ## ----echo=FALSE,fig.width=9.5,fig.height=2.5----------------------------------
@@ -83,13 +88,13 @@ plot(merge(kr[c(1,3)]), hook = hook, breaks = "equal")
 bl = krige(f == "Forest" ~ 1, v, aoi, v.fit, debug.level = 0)
 
 ## ----echo=FALSE---------------------------------------------------------------
-c(mean = bl$var1.pred)
+c(predicted_mean = bl$var1.pred)
 ci = bl$var1.pred + qnorm(c(.025,.975)) * sqrt(bl$var1.var)
 setNames(ci, c("p.025", "p.975"))
 
 
 ## ----echo=FALSE---------------------------------------------------------------
-c(mean = m <- mean(v$f == "Forest"))
+c(estimated_mean = m <- mean(v$f == "Forest"))
 se = sqrt(m * (1 - m) / n)
 setNames(m + qnorm(c(.025,.975)) * se, c("p.025", "p.975"))
 
