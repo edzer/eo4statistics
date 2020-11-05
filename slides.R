@@ -2,6 +2,7 @@
 knitr::opts_chunk$set(echo = TRUE)
 set.seed(1331)
 options(digits=3)
+point_col = "orange"
 
 
 ## ----echo=FALSE---------------------------------------------------------------
@@ -24,7 +25,7 @@ n = 50
 set.seed(100)
 s = st_sample(aoi, n)
 plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
-plot(s, add = TRUE, col = 'orange', pch = 3)
+plot(s, add = TRUE, col = point_col, pch = 3)
 v = st_extract(x["f",,,1], s)
 
 
@@ -47,7 +48,7 @@ nr = 6
 layout(matrix(1:11, 1), widths = c(1,.1,1,.1,1,.1,1,.1,1,.1,1))
 for (i in 1:nr) {
   plot(x["f",,,1], reset = FALSE, key.pos = NULL, main = NULL)
-  plot(st_sample(aoi, n), add = TRUE, col = 'orange', pch = 3)
+  plot(st_sample(aoi, n), add = TRUE, col = point_col, pch = 3)
   if (i < nr) plot.new()
 }
 
@@ -67,7 +68,7 @@ nr = 6
 layout(matrix(1:11, 1), widths = c(1,.1,1,.1,1,.1,1,.1,1,.1,1))
 for (i in 1:nr) {
   plot(x["f",,,i], reset = FALSE, key.pos = NULL, main = NULL)
-  plot(s, add = TRUE, col = 'orange', pch = 3)
+  plot(s, add = TRUE, col = point_col, pch = 3)
   if (i < nr) plot.new()
 }
 
@@ -82,7 +83,7 @@ plot(vg, v.fit)
 kr = krige(f == "Forest" ~ 1, v, grd, v.fit, debug.level = 0)
 kr$Population = x["f",,,1] == "Forest"
 names(kr)[1] = "Kriging prediction"
-hook = function(x) plot(s, add = TRUE, col = 'orange', pch = 3)
+hook = function(x) plot(s, add = TRUE, col = point_col, pch = 3)
 plot(merge(kr[c(1,3)]), hook = hook, breaks = "equal", col = rev(grey(2:10/12)))
 
 
@@ -109,14 +110,15 @@ plot(cs["f"], hook = hook, key.pos = 1, key.length = .4, key.width=lcm(1))
 
 
 ## ----echo=FALSE,results='hide',message = FALSE, warnings = FALSE--------------
-data <- data.frame(st_coordinates(v),"f"=v$f)
+data <- data.frame(st_coordinates(v), f = v$f)
+#data <- data.frame(st_coordinates(v), f = as.numeric(v$f))
 set.seed(100)
-model <- train(data[,c("X","Y")],data$f,method="rf",trControl = trainControl(method="cv"),
-               savePredictions=TRUE,importance=TRUE)
+model <- train(data[,c("X","Y")], data$f, method="rf", trControl = trainControl(method="cv"),
+               savePredictions=TRUE, importance=TRUE)
 
 prediction_dat <- st_coordinates(x)
 names(prediction_dat) <- c("X","Y")
-x$prediction=predict(model,prediction_dat)
+x$prediction=predict(model, prediction_dat)
 
 
 ## ----echo=FALSE, fig.show="hold", out.width="50%",message=FALSE,warning=FALSE----
@@ -124,8 +126,8 @@ x$prediction=predict(model,prediction_dat)
 print(paste0("Model accuracy: ",model$results$Accuracy, ". Really?"))
 
 plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
-plot(s, add = TRUE, col = 'orange', pch = 3)
+plot(s, add = TRUE, col = point_col, pch = 3)
 
 plot(x["prediction",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
-plot(s, add = TRUE, col = 'orange', pch = 3)
+plot(s, add = TRUE, col = point_col, pch = 3)
 
