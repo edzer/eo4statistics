@@ -9,7 +9,6 @@ point_col = "orange"
 suppressPackageStartupMessages(library(gstat))
 suppressPackageStartupMessages(library(stars))
 suppressPackageStartupMessages(library(caret))
-suppressPackageStartupMessages(library(raster))
 grd = st_as_stars(expand.grid(x = 1:100, y = 1:100))
 grd$x = 1
 v <- vgm(1, "Sph", 40)
@@ -111,22 +110,26 @@ plot(cs["f"], hook = hook, key.pos = 1, key.length = .4, key.width=lcm(1))
 
 
 ## ----echo=FALSE,results='hide',message = FALSE, warnings = FALSE--------------
-corners <- st_bbox(x)
-spp <- expand.grid(data.frame("x"=c(corners[1],corners[3]),"y"=c(corners[2],corners[4])))
-spp <- st_as_sf(spp, coords = c('x', 'y'))
+# corners <- st_bbox(x)
+# spp <- expand.grid(data.frame("x"=c(corners[1],corners[3]),"y"=c(corners[2],corners[4])))
+# spp <- st_as_sf(spp, coords = c('x', 'y'))
+spp = st_make_grid(x, n = c(7,7))
 
-for (i in 1:4){
-x$distance_4 <- distanceFromPoints(as(x,"Raster")[[1]], spp[i,]) 
-names(x)[names(x)=="distance_4"]=paste0("distance_",i)
+di = st_distance(spp, st_as_sf(x[,,,1], as_points = TRUE))
+pr_x = adrop(x[,,,1])
+for (i in 1:49) {
+  m = di[i,]
+  dim(m) = dim(pr_x)
+  pr_x[[i]] = m
 }
+names(pr_x) = paste0("distance_", 1:49)
+pr_x$f = x["f",,,1]
 
-
-data <- data.frame(st_coordinates(v),  st_extract(x[,,,1],v))
-#data <- data.frame(st_coordinates(v), f = as.numeric(v$f))
-model <- train(data[,names(data)%in%c("X","Y",paste0("distance_",1:4))], data$f, method="rf", trControl = trainControl(method="cv"),
+data <- data.frame(st_coordinates(v),  st_extract(pr_x, v))
+model <- train(data[, names(data) %in% c("X","Y",paste0("distance_",1:49))], data$f, method="rf", trControl = trainControl(method="cv"),
                savePredictions=TRUE, importance=TRUE)
 
-prediction_dat <- data.frame(st_coordinates(x),data.frame(x))
+prediction_dat <- data.frame(st_coordinates(pr_x),data.frame(pr_x))
 names(prediction_dat)[names(prediction_dat)=="x"] <- "X"
 names(prediction_dat)[names(prediction_dat)=="y"] <- "Y"
 x$prediction = predict(model, prediction_dat, type = "prob")[["Forest"]]
@@ -134,11 +137,9 @@ x$prediction = predict(model, prediction_dat, type = "prob")[["Forest"]]
 
 ## ----echo=FALSE, fig.show="hold", out.width="50%",message=FALSE,warning=FALSE----
 
-print(paste0("Model accuracy: ",round(max(model$results$Accuracy),2), ". Really?"))
-
 plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = "True Forest")
 plot(s, add = TRUE, col = point_col, pch = 3)
 
-plot(x["prediction",,,1], reset = FALSE, key.pos = 4, key.length = .4, main = "Random Forest, p(Forest)", col = rev(grey(2:10/12)), breaks = "equal")
+plot(x["prediction",,,1], reset = FALSE, key.pos = 4, main = "Random Forest, p(Forest)", col = rev(grey(2:10/12)), breaks = "equal")
 plot(s, add = TRUE, col = point_col, pch = 3)
 
