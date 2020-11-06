@@ -9,6 +9,7 @@ point_col = "orange"
 suppressPackageStartupMessages(library(gstat))
 suppressPackageStartupMessages(library(stars))
 suppressPackageStartupMessages(library(caret))
+suppressPackageStartupMessages(library(raster))
 grd = st_as_stars(expand.grid(x = 1:100, y = 1:100))
 grd$x = 1
 v <- vgm(1, "Sph", 40)
@@ -110,20 +111,30 @@ plot(cs["f"], hook = hook, key.pos = 1, key.length = .4, key.width=lcm(1))
 
 
 ## ----echo=FALSE,results='hide',message = FALSE, warnings = FALSE--------------
-data <- data.frame(st_coordinates(v), f = v$f)
+corners <- st_bbox(x)
+spp <- expand.grid(data.frame("x"=c(corners[1],corners[3]),"y"=c(corners[2],corners[4])))
+spp <- st_as_sf(spp, coords = c('x', 'y'))
+
+for (i in 1:4){
+x$distance_4 <- distanceFromPoints(as(x,"Raster")[[1]], spp[i,]) 
+names(x)[names(x)=="distance_4"]=paste0("distance_",i)
+}
+
+
+data <- data.frame(st_coordinates(v),  st_extract(x[,,,1],v))
 #data <- data.frame(st_coordinates(v), f = as.numeric(v$f))
-set.seed(100)
-model <- train(data[,c("X","Y")], data$f, method="rf", trControl = trainControl(method="cv"),
+model <- train(data[,names(data)%in%c("X","Y",paste0("distance_",1:4))], data$f, method="rf", trControl = trainControl(method="cv"),
                savePredictions=TRUE, importance=TRUE)
 
-prediction_dat <- st_coordinates(x)
-names(prediction_dat) <- c("X","Y")
+prediction_dat <- data.frame(st_coordinates(x),data.frame(x))
+names(prediction_dat)[names(prediction_dat)=="x"] <- "X"
+names(prediction_dat)[names(prediction_dat)=="y"] <- "Y"
 x$prediction = predict(model, prediction_dat, type = "prob")[["Forest"]]
 
 
 ## ----echo=FALSE, fig.show="hold", out.width="50%",message=FALSE,warning=FALSE----
 
-print(paste0("Model accuracy: ",model$results$Accuracy, ". Really?"))
+print(paste0("Model accuracy: ",round(max(model$results$Accuracy),2), ". Really?"))
 
 plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = "True Forest")
 plot(s, add = TRUE, col = point_col, pch = 3)
