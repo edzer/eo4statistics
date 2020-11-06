@@ -118,16 +118,16 @@ model <- train(data[,c("X","Y")], data$f, method="rf", trControl = trainControl(
 
 prediction_dat <- st_coordinates(x)
 names(prediction_dat) <- c("X","Y")
-x$prediction=predict(model, prediction_dat)
+x$prediction = predict(model, prediction_dat, type = "prob")[["Forest"]]
 
 
 ## ----echo=FALSE, fig.show="hold", out.width="50%",message=FALSE,warning=FALSE----
 
 print(paste0("Model accuracy: ",model$results$Accuracy, ". Really?"))
 
-plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
+plot(x["f",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = "True Forest")
 plot(s, add = TRUE, col = point_col, pch = 3)
 
-plot(x["prediction",,,1], reset = FALSE, key.pos = 4, key.length = .4, key.width = lcm(5), main = NULL)
+plot(x["prediction",,,1], reset = FALSE, key.pos = 4, key.length = .4, main = "Random Forest, p(Forest)", col = rev(grey(2:10/12)), breaks = "equal")
 plot(s, add = TRUE, col = point_col, pch = 3)
 
