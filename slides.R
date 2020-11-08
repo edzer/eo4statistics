@@ -117,13 +117,9 @@ spp = st_make_grid(x, n = c(7,7))
 
 di = st_distance(spp, st_as_sf(x[,,,1], as_points = TRUE))
 pr_x = adrop(x[,,,1])
-for (i in 1:49) {
-  m = di[i,]
-  dim(m) = dim(pr_x)
-  pr_x[[i]] = m
-}
-names(pr_x) = paste0("distance_", 1:49)
 pr_x$f = x["f",,,1]
+for (i in 1:49)
+  pr_x[[ paste0("distance_", i) ]] = di[i,]
 
 data <- data.frame(st_coordinates(v),  st_extract(pr_x, v))
 model <- train(data[, names(data) %in% c("X","Y",paste0("distance_",1:49))], data$f, method="rf", trControl = trainControl(method="cv"),
