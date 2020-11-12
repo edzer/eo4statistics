@@ -234,7 +234,8 @@ plot(s, add = TRUE, col = point_col, pch = 3)
 ```
 
 * How was the model validated?
-* Area average of predictions: `r mean(x["prediction",,,1][[1]])`
+* Area average of $\hat{p}_F$: `r mean(x["prediction",,,1][[1]])`; fraction of pixels with $\hat{p}_F > .5$: 
+`r mean(x["prediction",,,1][[1]] > .5)`
 * No sensible standard errors for area average estimates
 
 ## Comparison design-based / model-based
